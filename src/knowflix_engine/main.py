@@ -1,88 +1,89 @@
-#!/usr/bin/env python
-from pathlib import Path
+import json
+import sys
+import time
 
+from crewai.flow.flow import Flow, listen, or_, router, start
 from pydantic import BaseModel
 
-from crewai.flow import Flow, listen, start
-
-from knowflix_engine.crews.content_crew.content_crew import ContentCrew
-
-
-class ContentState(BaseModel):
-    topic: str = ""
-    outline: str = ""
-    draft: str = ""
-    final_post: str = ""
+from knowflix_engine.crews.document_crew.document_crew import DocumentCrew
+from knowflix_engine.guardrails.evidence import set_document_context
+from knowflix_engine.schemas.models import ParsedDocument
 
 
-class ContentFlow(Flow[ContentState]):
+class EngineState(BaseModel):
+    job_id: str = ""
+    job_type: str = "document"
+    parsed: dict | None = None
+    company_raw: dict | None = None
+    profile: dict | None = None
+    warnings: list[str] = []
+    metrics: dict = {}
+
+
+class KnowflixFlow(Flow[EngineState]):
 
     @start()
-    def plan_content(self, crewai_trigger_payload: dict = None):
-        print("Planning content")
+    def ingest(self):
+        if self.state.job_type == "document":
+            ParsedDocument(**self.state.parsed)
+        return "ingested"
 
-        if crewai_trigger_payload:
-            self.state.topic = crewai_trigger_payload.get("topic", "AI Agents")
-            print(f"Using trigger payload: {crewai_trigger_payload}")
-        else:
-            self.state.topic = "AI Agents"
+    @router(ingest)
+    def dispatch(self, previous_result):
+        return self.state.job_type
 
-        print(f"Topic: {self.state.topic}")
+    @listen("document")
+    def run_document(self):
+        doc = ParsedDocument(**self.state.parsed)
+        set_document_context(doc.full_text())
 
-    @listen(plan_content)
-    def generate_content(self):
-        print(f"Generating content on: {self.state.topic}")
-        result = (
-            ContentCrew()
-            .crew()
-            .kickoff(inputs={"topic": self.state.topic})
-        )
+        t0 = time.time()
+        result = DocumentCrew().crew().kickoff(inputs={
+            "lang": doc.lang,
+            "text_summary": doc.text_of(("abstract", "intro", "conclusion")),
+            "text_skills": doc.text_of(("method", "results", "discussion")),
+        })
+        elapsed = time.time() - t0
 
-        print("Content generated")
-        self.state.final_post = result.raw
+        self.state.profile = result.pydantic.model_dump()
+        usage = getattr(result, "token_usage", None)
+        self.state.metrics = {
+            "seconds": round(elapsed, 1),
+            "usage": usage.model_dump() if hasattr(usage, "model_dump") else str(usage),
+        }
 
-    @listen(generate_content)
-    def save_content(self):
-        print("Saving content")
-        output_dir = Path("output")
-        output_dir.mkdir(exist_ok=True)
-        with open(output_dir / "post.md", "w") as f:
-            f.write(self.state.final_post)
-        print("Post saved to output/post.md")
+    @listen("company")
+    def run_company(self):
+        self.state.profile = {
+            "skills": [],
+            "keywords": [],
+            "review_notes": "scout non ancora implementato",
+        }
+        self.state.warnings.append("ramo company: stub")
+
+    @listen(or_(run_document, run_company))
+    def finalize(self):
+        # TODO: linking tassonomia, persistenza, evento di indicizzazione
+        return self.state.profile
 
 
 def kickoff():
-    content_flow = ContentFlow()
-    content_flow.kickoff()
+    path = sys.argv[1] if len(sys.argv) > 1 else "fixtures/doc_test.json"
+    parsed = json.load(open(path, encoding="utf-8"))
+
+    flow = KnowflixFlow()
+    flow.kickoff(inputs={
+        "job_id": parsed["doc_id"],
+        "job_type": "document",
+        "parsed": parsed,
+    })
+
+    print(json.dumps(flow.state.profile, indent=2, ensure_ascii=False))
+    print("METRICHE:", flow.state.metrics)
 
 
 def plot():
-    content_flow = ContentFlow()
-    content_flow.plot()
-
-
-def run_with_trigger():
-    """
-    Run the flow with trigger payload.
-    """
-    import json
-    import sys
-
-    if len(sys.argv) < 2:
-        raise Exception("No trigger payload provided. Please provide JSON payload as argument.")
-
-    try:
-        trigger_payload = json.loads(sys.argv[1])
-    except json.JSONDecodeError:
-        raise Exception("Invalid JSON payload provided as argument")
-
-    content_flow = ContentFlow()
-
-    try:
-        result = content_flow.kickoff({"crewai_trigger_payload": trigger_payload})
-        return result
-    except Exception as e:
-        raise Exception(f"An error occurred while running the flow with trigger: {e}")
+    KnowflixFlow().plot()
 
 
 if __name__ == "__main__":

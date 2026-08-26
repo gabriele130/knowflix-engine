@@ -1333,7 +1333,7 @@ dependencies = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "crewai", extras = ["google-genai"], specifier = "==1.15.17" }]
+requires-dist = [{ name = "crewai", extras = ["google-genai", "ollama"], specifier = "==1.15.17" }]
 
 [[package]]
 name = "kubernetes"

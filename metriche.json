@@ -1,0 +1,7 @@
+[
+  {
+    "doc": "test001",
+    "ok": false,
+    "err": "429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'You exceeded your current quota, please check your plan and "
+  }
+]
