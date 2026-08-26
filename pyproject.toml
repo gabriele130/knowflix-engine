@@ -1,0 +1,23 @@
+[project]
+name = "knowflix_engine"
+version = "0.1.0"
+description = "knowflix_engine using crewAI"
+authors = [{ name = "Your Name", email = "you@example.com" }]
+requires-python = ">=3.10,<3.14"
+dependencies = [
+    "crewai[google-genai]==1.15.17",
+]
+
+[project.scripts]
+kickoff = "knowflix_engine.main:kickoff"
+run_crew = "knowflix_engine.main:kickoff"
+plot = "knowflix_engine.main:plot"
+run_with_trigger = "knowflix_engine.main:run_with_trigger"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.crewai]
+type = "flow"
+project_id = "221d7f4c-8ebb-4f35-b8a9-5dc68d0a46b2"
