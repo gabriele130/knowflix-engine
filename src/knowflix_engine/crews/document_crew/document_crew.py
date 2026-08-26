@@ -1,6 +1,6 @@
 from crewai import Agent, Crew, Process, Task
 from crewai.project import CrewBase, agent, crew, task
-
+from knowflix_engine.guardrails.evidence import evidence_guardrail
 from knowflix_engine.llms import LLM_MAIN, LLM_CHEAP
 from knowflix_engine.schemas.models import (
     SummaryOutput,
@@ -39,6 +39,8 @@ class DocumentCrew:
             config=self.tasks_config["extract_skills"],
             output_pydantic=SkillsOutput,
             context=[],
+            guardrail=evidence_guardrail,
+            guardrail_max_retries=2,
         )
 
     @task
