@@ -1,0 +1,35 @@
+{
+  "doc_id": "test001",
+  "lang": "it",
+  "meta": {
+    "anno": 2024,
+    "facolta": "Ingegneria Meccanica"
+  },
+  "sections": [
+    {
+      "kind": "abstract",
+      "text": "Il presente elaborato affronta il problema della manutenzione predittiva applicata a motori asincroni trifase impiegati in linee di confezionamento alimentare. L'obiettivo e' stato sviluppare un sistema in grado di anticipare i guasti ai cuscinetti volventi a partire dall'analisi dei segnali vibrazionali, riducendo i fermi macchina non programmati. Il lavoro e' stato condotto in collaborazione con un'azienda del settore, presso la quale sono stati raccolti i dati sperimentali su un arco di otto mesi."
+    },
+    {
+      "kind": "intro",
+      "text": "Nelle linee di produzione ad alta cadenza il fermo macchina non programmato rappresenta la principale voce di costo indiretto. Le strategie di manutenzione tradizionali, correttiva e preventiva a calendario, mostrano limiti evidenti: la prima interviene a danno avvenuto, la seconda comporta la sostituzione di componenti ancora funzionanti. La manutenzione predittiva si propone come terza via, basata sul monitoraggio continuo dello stato di salute del componente. La letteratura sull'analisi vibrazionale dei cuscinetti volventi e' consolidata, ma la maggior parte dei lavori si basa su dataset acquisiti in laboratorio con guasti indotti artificialmente, condizione lontana dall'ambiente industriale reale."
+    },
+    {
+      "kind": "method",
+      "text": "L'acquisizione dei dati e' stata realizzata mediante accelerometri piezoelettrici triassiali IEPE montati sui supporti dei cuscinetti lato comando e lato opposto comando, con frequenza di campionamento pari a 25.6 kHz. La catena di misura comprendeva un sistema di acquisizione National Instruments cDAQ-9174 con modulo NI 9234, gestito tramite script sviluppati in LabVIEW per l'automazione delle sessioni di acquisizione notturne.\n\nIl pre-processamento dei segnali e' stato implementato in Python utilizzando le librerie NumPy e SciPy. Su ciascuna finestra temporale di 1 secondo sono stati applicati un filtro passa-banda di Butterworth del quarto ordine tra 500 Hz e 10 kHz e una successiva demodulazione tramite trasformata di Hilbert, al fine di estrarre l'inviluppo del segnale. Sull'inviluppo e' stata calcolata la trasformata di Fourier veloce per individuare le frequenze caratteristiche di difetto della pista esterna e della pista interna, calcolate analiticamente a partire dalla geometria del cuscinetto e dalla velocita' di rotazione dell'albero.\n\nDal dominio del tempo sono stati estratti indicatori statistici classici: valore efficace, fattore di cresta, curtosi e asimmetria. Dal dominio della frequenza sono state ricavate l'ampiezza alle frequenze di difetto e le relative armoniche fino al terzo ordine. Complessivamente sono state generate 34 feature per ogni finestra di osservazione. La selezione delle feature piu' informative e' stata condotta mediante analisi della mutua informazione rispetto all'etichetta di stato, riducendo lo spazio a 12 variabili.\n\nLa fase di classificazione ha previsto il confronto tra tre algoritmi di apprendimento supervisionato implementati con scikit-learn: Random Forest, Support Vector Machine con kernel radiale e Gradient Boosting. La validazione e' stata eseguita mediante cross-validation stratificata a 5 fold, adottando come metriche principali il richiamo sulla classe di guasto e l'area sotto la curva ROC. Data la forte sbilanciatura del dataset, con soli 213 campioni in condizione di degrado su oltre 18.000 osservazioni totali, e' stata applicata la tecnica di sovracampionamento SMOTE sul solo insieme di addestramento, evitando contaminazione tra training e test.\n\nL'etichettatura dei dati e' avvenuta a posteriori, incrociando i timestamp delle acquisizioni con il registro degli interventi manutentivi estratto dal sistema gestionale aziendale tramite query SQL su database Oracle. Le finestre temporali comprese tra i quindici giorni precedenti la sostituzione del cuscinetto e l'intervento stesso sono state etichettate come stato di degrado."
+    },
+    {
+      "kind": "results",
+      "text": "Il modello Random Forest ha fornito le prestazioni migliori, con un richiamo sulla classe di guasto pari a 0.87 e un'area sotto la curva ROC di 0.94 in cross-validation. La Support Vector Machine ha mostrato prestazioni comparabili in termini di accuratezza complessiva ma con un numero significativamente maggiore di falsi negativi, condizione inaccettabile nel contesto applicativo. L'analisi dell'importanza delle variabili ha evidenziato come la curtosi dell'inviluppo e l'ampiezza alla frequenza caratteristica della pista esterna siano risultati gli indicatori piu' discriminanti.\n\nL'applicazione del modello sui dati di validazione temporale, costituiti dagli ultimi due mesi di acquisizione non utilizzati in addestramento, ha permesso di anticipare due dei tre eventi di guasto verificatisi, con un preavviso medio di nove giorni. Il terzo evento, riconducibile a un difetto di lubrificazione piuttosto che a un danneggiamento delle piste, non e' stato rilevato dal sistema."
+    },
+    {
+      "kind": "discussion",
+      "text": "I risultati confermano la fattibilita' dell'approccio in ambiente industriale reale, pur con alcune limitazioni. La principale riguarda la scarsita' di eventi di guasto documentati, che ha reso necessario ricorrere a tecniche di sovracampionamento con il rischio di sovradattamento. Un secondo limite risiede nella variabilita' delle condizioni operative: la linea lavora con formati di prodotto diversi che comportano regimi di rotazione differenti, e il modello attuale non normalizza rispetto a questa variabile. L'estensione a un approccio non supervisionato basato su rilevamento di anomalie potrebbe superare il vincolo dell'etichettatura."
+    },
+    {
+      "kind": "conclusion",
+      "text": "Il lavoro ha portato allo sviluppo di un sistema di manutenzione predittiva funzionante su un caso industriale reale, dall'acquisizione del segnale fino alla classificazione dello stato di salute. Il sistema e' stato integrato in un cruscotto di monitoraggio realizzato con Grafana, alimentato da un database temporale InfluxDB. Gli sviluppi futuri riguardano l'estensione ad altri componenti della linea e la normalizzazione rispetto alle condizioni operative."
+    }
+  ],
+  "figures": []
+}

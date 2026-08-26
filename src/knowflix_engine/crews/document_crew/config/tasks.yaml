@@ -1,0 +1,42 @@
+summarize:
+  description: >
+    Analizza questo elaborato scritto in lingua {lang}.
+
+    TESTO:
+    {text_summary}
+
+    Produci: one_liner (massimo 25 parole), abstract_150 (circa 150 parole),
+    keywords (da 5 a 10 termini tecnici specifici, non generici).
+    Non citare l'autore ne' il titolo. Scrivi in lingua {lang}.
+  expected_output: >
+    Un oggetto JSON con i campi one_liner, abstract_150, keywords.
+  agent: analyst
+
+extract_skills:
+  description: >
+    Estrai le competenze tecniche dimostrate dall'autore. Lavora
+    ESCLUSIVAMENTE sulle sezioni metodologiche e di risultati qui sotto.
+
+    TESTO:
+    {text_skills}
+
+    Per ogni competenza fornisci: label (nome della competenza),
+    evidence (la frase ESATTA copiata dal testo, verbatim),
+    section_kind, confidence (valore tra 0 e 1).
+
+    Vietato: competenze trasversali generiche; competenze dedotte dal dominio
+    invece che dal metodo; evidence riformulate o parafrasate.
+    Massimo 12 competenze.
+  expected_output: >
+    Un oggetto JSON con la lista skills.
+  agent: skill_extractor
+
+review:
+  description: >
+    Ricevi la sintesi e le competenze estratte. Elimina le competenze
+    generiche o non supportate dalla evidence. Verifica che le keyword siano
+    coerenti con le competenze. Elenca in rejected le competenze scartate
+    con il relativo motivo.
+  expected_output: >
+    Il profilo completo rivisto, in formato JSON.
+  agent: reviewer
