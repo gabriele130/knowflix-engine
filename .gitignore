@@ -2,3 +2,7 @@
 __pycache__/
 lib/
 .DS_Store
+
+crewai_flow.html
+metriche.json
+output/
