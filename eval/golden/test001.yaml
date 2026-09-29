@@ -1,0 +1,5 @@
+doc_id: test001
+expected_skills:
+- skill_id: example-skill
+  evidence: Inserisci qui la frase esatta
+  tier: core

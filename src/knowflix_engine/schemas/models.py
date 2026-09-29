@@ -1,6 +1,5 @@
-from typing import Literal
+﻿from typing import Literal
 from pydantic import BaseModel, Field
-
 
 # --- INPUT: contratto con chi fa il preprocessing PyMuPDF ---
 
@@ -17,6 +16,8 @@ class ParsedDocument(BaseModel):
     meta: dict = {}
     sections: list[Section]
     figures: list[dict] = []
+    parser_version: str = "1.0"
+    bibliography: str = ""
 
     def text_of(self, kinds: tuple[str, ...]) -> str:
         return "\n\n".join(s.text for s in self.sections if s.kind in kinds)

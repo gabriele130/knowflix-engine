@@ -1,0 +1,87 @@
+{
+  "one_liner": "Sistema di manutenzione predittiva per motori asincroni trifase in linee di confezionamento alimentare.",
+  "abstract_150": "L'elaborato affronta il problema della manutenzione predittiva per motori asincroni trifase in linee di produzione alimentari. Si sviluppa un sistema basato sull'analisi dei segnali vibrazionali per prevedere guasti ai cuscinetti volventi, integrato in un cruscotto Grafana alimentato da InfluxDB. Il sistema si distingue per l'uso di dataset reali e l'estensione prevista a altri componenti.",
+  "keywords": [
+    "manutenzione predittiva",
+    "motori asincroni trifase",
+    "linee di confezionamento alimentare",
+    "analisi vibrazionale",
+    "cuscinetti volventi",
+    "Grafana",
+    "InfluxDB"
+  ],
+  "skills": [
+    {
+      "label": "acquisizione dati",
+      "evidence": "L'acquisizione dei dati e' stata realizzata mediante accelerometri piezoelettrici triassiali IEPE montati sui supporti dei cuscinetti lato comando e lato opposto comando, con frequenza di campionamento pari a 25.6 kHz.",
+      "section_kind": "metodologia",
+      "confidence": 1.0,
+      "skill_id": null
+    },
+    {
+      "label": "pre-processamento segnali",
+      "evidence": "Il pre-processamento dei segnali e' stato implementato in Python utilizzando le librerie NumPy e SciPy.",
+      "section_kind": "metodologia",
+      "confidence": 1.0,
+      "skill_id": null
+    },
+    {
+      "label": "utilizzo di filtro passa-banda",
+      "evidence": "Su ciascuna finestra temporale di 1 secondo sono stati applicati un filtro passa-banda di Butterworth del quarto ordine tra 500 Hz e 10 kHz",
+      "section_kind": "metodologia",
+      "confidence": 1.0,
+      "skill_id": null
+    },
+    {
+      "label": "calcolo trasformata di Fourier",
+      "evidence": "Sull'inviluppo e' stata calcolata la trasformata di Fourier veloce per individuare le frequenze caratteristiche di difetto della pista esterna e della pista interna",
+      "section_kind": "metodologia",
+      "confidence": 1.0,
+      "skill_id": null
+    },
+    {
+      "label": "selezione feature",
+      "evidence": "La selezione delle feature piu' informative e' stata condotta mediante analisi della mutua informazione rispetto all'etichetta di stato, riducendo lo spazio a 12 variabili.",
+      "section_kind": "metodologia",
+      "confidence": 1.0,
+      "skill_id": null
+    },
+    {
+      "label": "classificazione supervisionata",
+      "evidence": "La fase di classificazione ha previsto il confronto tra tre algoritmi di apprendimento supervisionato implementati con scikit-learn: Random Forest, Support Vector Machine con kernel radiale e Gradient Boosting.",
+      "section_kind": "metodologia",
+      "confidence": 1.0,
+      "skill_id": null
+    },
+    {
+      "label": "validazione modello",
+      "evidence": "La validazione e' stata eseguita mediante cross-validation stratificata a 5 fold, adottando come metriche principali il richiamo sulla classe di guasto e l'area sotto la curva ROC.",
+      "section_kind": "metodologia",
+      "confidence": 1.0,
+      "skill_id": null
+    },
+    {
+      "label": "tecniche di sovracampionamento",
+      "evidence": "Data la forte sbilanciatura del dataset, con soli 213 campioni in condizione di degrado su oltre 18.000 osservazioni totali, e' stata applicata la tecnica di sovracampionamento SMOTE sul solo insieme di addestramento, evitando contaminazione tra training e test.",
+      "section_kind": "metodologia",
+      "confidence": 1.0,
+      "skill_id": null
+    },
+    {
+      "label": "etichettatura dati",
+      "evidence": "L'etichettatura dei dati e' avvenuta a posteriori, incrociando i timestamp delle acquisizioni con il registro degli interventi manutentivi estratto dal sistema gestionale aziendale tramite query SQL su database Oracle.",
+      "section_kind": "metodologia",
+      "confidence": 1.0,
+      "skill_id": null
+    },
+    {
+      "label": "analisi importanza variabili",
+      "evidence": "L'analisi dell'importanza delle variabili ha evidenziato come la curtosi dell'inviluppo e l'ampiezza alla frequenza caratteristica della pista esterna siano risultati gli indicatori piu' discriminanti.",
+      "section_kind": "metodologia",
+      "confidence": 1.0,
+      "skill_id": null
+    }
+  ],
+  "rejected": [],
+  "review_notes": ""
+}
