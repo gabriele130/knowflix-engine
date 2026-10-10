@@ -26,13 +26,13 @@ frontend downstream.
                   └──┬────┬──┘
                      │    │
           ┌──────────▼┐  ┌▼────────────┐
-          │ "document" │  │  "company"  │  (stub)
+          │ "document" │  │  "company"  │
           │ run_document│  │ run_company │
           └──────┬─────┘  └──────┬──────┘
                  │               │
                  └───────┬───────┘
                     ┌────▼────┐
-                    │finalize │   linking tassonomia (TODO)
+                    │finalize │   linking tassonomia + cover (persistenza: TODO)
                     └─────────┘
 ```
 
@@ -43,7 +43,7 @@ frontend downstream.
 | `ingest` | Deserializza il JSON di input in `ParsedDocument`, validando lo schema |
 | `dispatch` | **Router deterministico Python** — legge `state.job_type` e instrada |
 | `run_document` | Inietta il full-text nel contesto del guardrail, poi lancia `DocumentCrew` |
-| `finalize` | Punto di convergenza per tutti i rami; placeholder per linking a tassonomia e persistenza |
+| `finalize` | Punto di convergenza per tutti i rami; chiama `link_profile` (tassonomia) se il profilo non è degradato/vuoto; persistenza ed evento di indicizzazione restano TODO |
 
 ### Pipeline della DocumentCrew (sequential)
 
@@ -70,6 +70,10 @@ reviewer → review (→ ReviewedProfile, context: summarize + extract_skills)
 src/knowflix_engine/
 ├── main.py                     # Flow (KnowflixFlow), stato, entry-point CLI
 ├── llms.py                     # Istanze LLM condivise (LLM_MAIN, LLM_CHEAP)
+├── config.py                   # ENGINE_VERSION (chiave cache), tabella prezzi
+├── taxonomy.py                 # link_profile: linking deterministico skill → tassonomia
+├── cover.py                    # pick_cover/score_figure: scoring deterministico figure
+├── feedback.py                 # log_correction: logging correzioni umane in JSONL
 ├── schemas/
 │   └── models.py               # Modelli Pydantic: contratto dati pubblico ⚠️
 ├── guardrails/
@@ -81,7 +85,10 @@ src/knowflix_engine/
 │   │       ├── agents.yaml     # Ruoli/goal/backstory dei 3 agenti
 │   │       └── tasks.yaml      # Descrizioni task con interpolazione {lang}, {text_*}
 │   └── scout_crew/
-│       └── config/             # Vuoto — ramo company non ancora implementato
+│       ├── scout_crew.py       # Crew @CrewBase, stessa struttura a 3 task di document_crew
+│       └── config/
+│           ├── agents.yaml     # analyst, tech_scout, reviewer
+│           └── tasks.yaml      # Interpolazione {lang}, {text_company}
 ├── tools/
 │   ├── __init__.py
 │   └── custom_tool.py          # Tool di esempio (template scaffold)
@@ -131,10 +138,15 @@ class ReviewedProfile(BaseModel):
                                 #         + confidence + skill_id?
     rejected: list[str] = []
     review_notes: str = ""
+    cover_figure_id: str | None = None
 ```
 
 Questo è l'output finale del Flow, serializzato in `state.profile` come dict
-e stampato su stdout.
+e stampato su stdout. `skill_id` su ogni `Skill` è popolato in `finalize` da
+`taxonomy.link_profile` (lookup statico + fuzzy-match, mai LLM); resta `None`
+se non c'è match sopra soglia. `cover_figure_id` è popolato in `run_document`
+da `cover.pick_cover` sulle `figures` del documento, stesso criterio
+deterministico.
 
 I modelli intermedi `SummaryOutput` e `SkillsOutput` sono usati come
 `output_pydantic` nelle singole task per forzare output strutturato.
@@ -226,11 +238,17 @@ def dispatch(self, previous_result):
 
 ### 6.4 · Matching e linking tassonomia
 
-Il futuro linking delle competenze alla tassonomia (oggi TODO in `finalize`)
-**deve restare deterministico**: lookup, fuzzy-match, mapping statico.
+Implementato in `taxonomy.py` (`link_profile`) e chiamato da `finalize` in
+`main.py`. Lookup esatto su label/sinonimi + fuzzy-match (`SequenceMatcher`,
+soglia 0.85) su una tabella statica `TAXONOMY`. **Resta deterministico**:
+nessuna chiamata LLM.
 
 - ❌ Mai delegare il matching a un agente LLM.
 - ✅ Strumenti ammessi: embedding similarity, dizionari, tabelle di mapping.
+- ❌ `link_profile` **non va mai chiamato** su un profilo degradato
+  (`metrics["failed"]`) o senza skill: altrimenti una metrica di copertura
+  tassonomica risulterebbe fuorviante (1.0 su un fallimento). La guardia è
+  in `finalize` — non rimuoverla aggiungendo nuovi punti di chiamata.
 
 ### 6.5 · Nessuna chiave o token nei file versionati
 
@@ -252,7 +270,22 @@ Il futuro linking delle competenze alla tassonomia (oggi TODO in `finalize`)
    aggiornare `main.py`.
 4. `LLM_MAIN` e `LLM_CHEAP` in `llms.py` sono le uniche istanze LLM: non
    crearne di nuove senza motivo.
-5. Il ramo `company` / `scout_crew` è uno **stub**: prima di implementarlo,
-   discutere il design.
+5. Il ramo `company` / `scout_crew` usa `ScoutCrew` (3 task sequenziali
+   analoghi a `DocumentCrew`), **senza ricerca web**: lavora solo sul testo
+   ottenuto appiattendo i campi stringa di `company_raw`. L'`evidence` delle
+   skill deve essere verbatim rispetto a quel testo (stesso
+   `evidence_guardrail`, invariante 6.2) — non sulla conoscenza generale
+   del modello sull'azienda. Se `company_raw` contiene solo il nome
+   azienda, è corretto che la crew non estragga skill: significa che non
+   ci sono dati sufficienti, non è un bug.
 6. `tools/custom_tool.py` è un placeholder dallo scaffold crewai — non è
    usato da nessuna crew.
+7. **Invariante**: la task `extract_skills` in `document_crew.py` ha
+   `context=[]` esplicito. Serve a impedire che la crew inietti di default
+   l'output di `summarize` nel contesto dell'estrazione competenze — le
+   competenze devono derivare solo da `{text_skills}` (method/results/
+   discussion), non dalla sintesi. Non rimuovere `context=[]` per "comodità"
+   di condividere contesto tra task.
+8. `feedback.py` (`log_correction`) appende correzioni umane in
+   `feedback/corrections.jsonl`. Non ha ancora un chiamante nel repo: va
+   invocato dal backend/UI quando un reviewer corregge un profilo.

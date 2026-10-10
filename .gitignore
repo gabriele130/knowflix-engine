@@ -6,3 +6,5 @@ lib/
 crewai_flow.html
 metriche.json
 output/
+
+cache/
