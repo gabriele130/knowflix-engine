@@ -1,0 +1,33 @@
+{
+  "properties": {
+    "code": {
+      "enum": [
+        "invalid_payload",
+        "unsupported_payload_version",
+        "unauthorized",
+        "empty_content",
+        "rate_limited",
+        "provider_unavailable",
+        "timeout",
+        "internal_error"
+      ],
+      "title": "Code",
+      "type": "string"
+    },
+    "message": {
+      "title": "Message",
+      "type": "string"
+    },
+    "retryable": {
+      "title": "Retryable",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "code",
+    "message",
+    "retryable"
+  ],
+  "title": "EngineError",
+  "type": "object"
+}

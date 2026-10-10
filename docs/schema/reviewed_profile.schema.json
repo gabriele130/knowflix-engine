@@ -1,0 +1,159 @@
+{
+  "$defs": {
+    "PublicCard": {
+      "description": "Scheda pubblica. Non popolata in questa versione.",
+      "properties": {
+        "abstract": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Abstract"
+        }
+      },
+      "title": "PublicCard",
+      "type": "object"
+    },
+    "Skill": {
+      "properties": {
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "evidence": {
+          "description": "Frase testuale esatta dal documento",
+          "title": "Evidence",
+          "type": "string"
+        },
+        "section_kind": {
+          "enum": [
+            "abstract",
+            "introduction",
+            "methodology",
+            "results",
+            "discussion",
+            "conclusions",
+            "bibliography",
+            "appendix",
+            "other"
+          ],
+          "title": "Section Kind",
+          "type": "string"
+        },
+        "confidence": {
+          "title": "Confidence",
+          "type": "number"
+        },
+        "skill_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Skill Id"
+        }
+      },
+      "required": [
+        "label",
+        "evidence",
+        "section_kind",
+        "confidence"
+      ],
+      "title": "Skill",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "one_liner": {
+      "title": "One Liner",
+      "type": "string"
+    },
+    "abstract_150": {
+      "title": "Abstract 150",
+      "type": "string"
+    },
+    "keywords": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Keywords",
+      "type": "array"
+    },
+    "skills": {
+      "items": {
+        "$ref": "#/$defs/Skill"
+      },
+      "title": "Skills",
+      "type": "array"
+    },
+    "rejected": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Rejected",
+      "type": "array"
+    },
+    "review_notes": {
+      "default": "",
+      "title": "Review Notes",
+      "type": "string"
+    },
+    "cover_figure_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Cover Figure Id"
+    },
+    "taxonomy_version": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Taxonomy Version"
+    },
+    "taxonomy_coverage": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Taxonomy Coverage"
+    },
+    "public_card": {
+      "$ref": "#/$defs/PublicCard"
+    }
+  },
+  "required": [
+    "one_liner",
+    "abstract_150",
+    "keywords",
+    "skills"
+  ],
+  "title": "ReviewedProfile",
+  "type": "object"
+}

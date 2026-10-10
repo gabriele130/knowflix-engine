@@ -1,0 +1,94 @@
+{
+  "$defs": {
+    "Section": {
+      "properties": {
+        "kind": {
+          "enum": [
+            "abstract",
+            "introduction",
+            "methodology",
+            "results",
+            "discussion",
+            "conclusions",
+            "bibliography",
+            "appendix",
+            "other"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "heading": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Heading"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "text"
+      ],
+      "title": "Section",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "doc_id": {
+      "title": "Doc Id",
+      "type": "string"
+    },
+    "lang": {
+      "default": "it",
+      "title": "Lang",
+      "type": "string"
+    },
+    "meta": {
+      "additionalProperties": true,
+      "default": {},
+      "title": "Meta",
+      "type": "object"
+    },
+    "sections": {
+      "items": {
+        "$ref": "#/$defs/Section"
+      },
+      "title": "Sections",
+      "type": "array"
+    },
+    "figures": {
+      "default": [],
+      "items": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "title": "Figures",
+      "type": "array"
+    },
+    "parser_version": {
+      "default": "1.0",
+      "title": "Parser Version",
+      "type": "string"
+    },
+    "bibliography": {
+      "default": "",
+      "title": "Bibliography",
+      "type": "string"
+    }
+  },
+  "required": [
+    "doc_id",
+    "sections"
+  ],
+  "title": "ParsedDocument",
+  "type": "object"
+}

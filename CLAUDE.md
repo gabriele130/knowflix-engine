@@ -40,27 +40,30 @@ frontend downstream.
 
 | Step | Cosa fa |
 |------|---------|
-| `ingest` | Deserializza il JSON di input in `ParsedDocument`, validando lo schema |
+| `ingest` | Valida l'input (`parser_version` se presente, schema `ParsedDocument`, contenuto non vuoto); in caso di errore registra un `EngineError` e i rami successivi non lanciano crew |
 | `dispatch` | **Router deterministico Python** — legge `state.job_type` e instrada |
-| `run_document` | Inietta il full-text nel contesto del guardrail, poi lancia `DocumentCrew` |
-| `finalize` | Punto di convergenza per tutti i rami; chiama `link_profile` (tassonomia) se il profilo non è degradato/vuoto; persistenza ed evento di indicizzazione restano TODO |
+| `run_document` | Passa al guardrail le sole sezioni `SKILL_KINDS`, lancia `DocumentCrew` (progress 0/33/66/100), assembla il `ReviewedProfile` assegnando `section_kind` dalla sezione in cui l'evidence è trovata |
+| `finalize` | Punto di convergenza per tutti i rami; restituisce l'`EngineError` se il job è fallito, altrimenti chiama `link_profile` (se ci sono skill), calcola `taxonomy_coverage` e imposta `taxonomy_version`; persistenza ed evento di indicizzazione restano TODO |
 
 ### Pipeline della DocumentCrew (sequential)
 
 ```
 analyst → summarize (→ SummaryOutput)
-skill_extractor → extract_skills (→ SkillsOutput, guardrail: evidence)
-reviewer → review (→ ReviewedProfile, context: summarize + extract_skills)
+skill_extractor → extract_skills (→ ExtractedSkills, guardrail: evidence)
+reviewer → review (→ ReviewDraft, guardrail: evidence, context: summarize + extract_skills)
 ```
 
 - **analyst / summarize**: produce `one_liner`, `abstract_150`, `keywords` a
-  partire da abstract + intro + conclusion.
-- **skill_extractor / extract_skills**: estrae competenze con evidence
-  verbatim da method + results + discussion. Il guardrail `evidence_guardrail`
-  verifica che ogni evidence sia realmente presente nel testo; se non lo è,
-  rigetta l'output (max 2 retry).
+  partire da `SUMMARY_KINDS` (abstract + introduction + conclusions).
+- **skill_extractor / extract_skills**: estrae competenze (label, evidence
+  verbatim, confidence) da `SKILL_KINDS` (methodology + results +
+  discussion). Non produce `section_kind`.
 - **reviewer / review**: unisce sintesi e competenze, scarta le generiche,
-  produce il `ReviewedProfile` finale.
+  produce un `ReviewDraft`. Il motore lo trasforma in `ReviewedProfile`
+  (`main.assemble_profile`).
+- Il guardrail `evidence_guardrail` è applicato sia a `extract_skills` sia a
+  `review` (max 2 retry ciascuno): la garanzia sulle evidence vale sul
+  profilo finale. Stessa struttura nella `ScoutCrew`.
 
 ---
 
@@ -70,14 +73,16 @@ reviewer → review (→ ReviewedProfile, context: summarize + extract_skills)
 src/knowflix_engine/
 ├── main.py                     # Flow (KnowflixFlow), stato, entry-point CLI
 ├── llms.py                     # Istanze LLM condivise (LLM_MAIN, LLM_CHEAP)
-├── config.py                   # ENGINE_VERSION (chiave cache), tabella prezzi
+├── config.py                   # ENGINE_VERSION (chiave cache), TAXONOMY_VERSION,
+│                               # SUPPORTED_PARSER_VERSIONS, tabella prezzi
 ├── taxonomy.py                 # link_profile: linking deterministico skill → tassonomia
 ├── cover.py                    # pick_cover/score_figure: scoring deterministico figure
 ├── feedback.py                 # log_correction: logging correzioni umane in JSONL
 ├── schemas/
-│   └── models.py               # Modelli Pydantic: contratto dati pubblico ⚠️
+│   └── models.py               # Modelli Pydantic, SectionKind, SUMMARY/SKILL_KINDS,
+│                               # EngineError: contratto dati pubblico ⚠️
 ├── guardrails/
-│   └── evidence.py             # Guardrail evidence: verifica citazioni testuali
+│   └── evidence.py             # Guardrail evidence + locate_evidence (section_kind)
 ├── crews/
 │   ├── document_crew/
 │   │   ├── document_crew.py    # Crew @CrewBase, agenti, task, guardrail wiring
@@ -103,6 +108,9 @@ File nella root:
 | `fixtures/doc_test.json` | Documento di test usato come input di default |
 | `prova_crew.py` | Script manuale per testare la crew isolata |
 | `prova_company.py` | Script manuale per testare il ramo `company` |
+| `scripts/gen_schema.py` | Genera `docs/schema/*.schema.json` e `docs/ENGINE_CONTRACT.md` dal codice (`--check` per verificare) |
+| `scripts/gen_example_output.py` | Run reale sul fixture → `docs/schema/example_output.json` |
+| `docs/` | Documentazione del contratto, **generata**: non modificarla a mano |
 | `pyproject.toml` | Metadata progetto, entry-point, tipo `flow` |
 | `.env` | Chiavi API e configurazione modello (git-ignored) |
 
@@ -117,15 +125,31 @@ class ParsedDocument(BaseModel):
     doc_id: str
     lang: str = "it"
     meta: dict = {}
-    sections: list[Section]     # kind ∈ {abstract, intro, method, results,
-                                #          discussion, conclusion, other}
+    sections: list[Section]     # kind: SectionKind, vedi sotto
     figures: list[dict] = []
+    parser_version: str = "1.0" # facoltativo, vedi sotto
+    bibliography: str = ""
 ```
+
+`SectionKind` = `abstract`, `introduction`, `methodology`, `results`,
+`discussion`, `conclusions`, `bibliography`, `appendix`, `other`.
+
+- `SUMMARY_KINDS` = abstract, introduction, conclusions → sintesi.
+- `SKILL_KINDS` = methodology, results, discussion → estrazione competenze
+  e unico perimetro in cui il guardrail cerca le evidence.
+- `bibliography`, `appendix`, `other` sono accettate in ingresso ma escluse
+  da sintesi ed estrazione.
+
+`parser_version` è facoltativo: se assente il payload è accettato; se
+presente deve stare in `config.SUPPORTED_PARSER_VERSIONS`, altrimenti
+`unsupported_payload_version`. Non trasformarlo in un gate obbligatorio: il
+backend oggi non lo invia.
 
 Metodi helper: `text_of(kinds)` e `full_text()`.
 
 Il JSON di input (prodotto dal preprocessor PyMuPDF a monte) deve rispettare
-questo schema. `sections` è obbligatorio e non vuoto.
+questo schema. Se nessuna sezione usata dal motore contiene testo il job
+fallisce con `empty_content`.
 
 ### `ReviewedProfile` (output)
 
@@ -135,21 +159,38 @@ class ReviewedProfile(BaseModel):
     abstract_150: str
     keywords: list[str]
     skills: list[Skill]         # Skill = label + evidence + section_kind
-                                #         + confidence + skill_id?
+                                #         (SectionKind) + confidence + skill_id?
     rejected: list[str] = []
     review_notes: str = ""
     cover_figure_id: str | None = None
+    taxonomy_version: str | None = None
+    taxonomy_coverage: float | None = None
+    public_card: PublicCard     # solo `abstract`, non popolato
 ```
+
+`Skill.section_kind` è assegnato dal motore (`locate_evidence`: la sezione in
+cui l'evidence è trovata), **mai** generato dall'LLM.
 
 Questo è l'output finale del Flow, serializzato in `state.profile` come dict
 e stampato su stdout. `skill_id` su ogni `Skill` è popolato in `finalize` da
 `taxonomy.link_profile` (lookup statico + fuzzy-match, mai LLM); resta `None`
 se non c'è match sopra soglia. `cover_figure_id` è popolato in `run_document`
 da `cover.pick_cover` sulle `figures` del documento, stesso criterio
-deterministico.
+deterministico. `taxonomy_coverage` è la quota di skill con `skill_id` non
+nullo (null senza skill); `taxonomy_version` è `config.TAXONOMY_VERSION`.
 
-I modelli intermedi `SummaryOutput` e `SkillsOutput` sono usati come
-`output_pydantic` nelle singole task per forzare output strutturato.
+Se il job fallisce, il Flow restituisce invece un `EngineError`
+(`code`, `message`, `retryable`) in `state.error`, con `state.profile`
+null: mai un profilo parziale. Solo `rate_limited`, `provider_unavailable` e
+`timeout` sono `retryable`.
+
+I modelli intermedi `SummaryOutput`, `ExtractedSkills` e `ReviewDraft` sono
+usati come `output_pydantic` nelle singole task per forzare output
+strutturato. `SkillsOutput` non è più usato dalle crew.
+
+Il contratto completo è in `docs/ENGINE_CONTRACT.md`, generato da
+`scripts/gen_schema.py`; `tests/test_contract_docs.py` fallisce se resta
+indietro rispetto ai modelli.
 
 ---
 
@@ -212,15 +253,25 @@ uv run plot
 - ❌ **Non si modifica** la shape dei modelli esistenti: non rinominare campi,
   non cambiarne il tipo, non rimuoverli.
 - ❌ Non spostare il modulo né cambiarne il path di import.
+- ❌ Non togliere né rinominare valori di `SectionKind` o `ErrorCode`, e non
+  cambiare quali codici sono in `RETRYABLE_CODES`: il backend ci si appoggia.
+- ✅ Dopo ogni modifica ai modelli: `uv run python scripts/gen_schema.py` e
+  commit dei file in `docs/` generati.
 
 ### 6.2 · `guardrails/evidence.py` — Soglia evidence
 
-Il guardrail `evidence_guardrail` verifica che ogni `Skill.evidence` sia una
-citazione testuale presente nel documento sorgente (fuzzy match ≥ 0.90).
+Il guardrail `evidence_guardrail` verifica che ogni evidence sia una
+citazione testuale presente **dentro una singola sezione** tra `SKILL_KINDS`
+(methodology, results, discussion), con fuzzy match ≥ 0.90. Un'evidence che
+scavalca due sezioni o viene da altre sezioni è rifiutata. È applicato sia a
+`extract_skills` sia a `review` (e agli omologhi della `ScoutCrew`), così la
+garanzia vale sul profilo finale.
 
 - ❌ **Non si allenta la soglia** per far passare più competenze.
-- ❌ Non si disabilita il guardrail o si alzano i `guardrail_max_retries`
-  oltre un livello ragionevole.
+- ❌ Non si disabilita il guardrail su nessuna delle due task, e non si
+  alzano i `guardrail_max_retries` oltre un livello ragionevole.
+- ❌ Non si allarga il perimetro di ricerca oltre `SKILL_KINDS` (es. al
+  full-text): `section_kind` deve restare la sezione di provenienza reale.
 - ✅ Si può rendere il matching più robusto (normalizzazione, encoding), ma
   mai meno restrittivo.
 
@@ -283,7 +334,7 @@ nessuna chiamata LLM.
 7. **Invariante**: la task `extract_skills` in `document_crew.py` ha
    `context=[]` esplicito. Serve a impedire che la crew inietti di default
    l'output di `summarize` nel contesto dell'estrazione competenze — le
-   competenze devono derivare solo da `{text_skills}` (method/results/
+   competenze devono derivare solo da `{text_skills}` (methodology/results/
    discussion), non dalla sintesi. Non rimuovere `context=[]` per "comodità"
    di condividere contesto tra task.
 8. `feedback.py` (`log_correction`) appende correzioni umane in
