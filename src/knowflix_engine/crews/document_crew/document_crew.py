@@ -3,9 +3,9 @@ from crewai.project import CrewBase, agent, crew, task
 from knowflix_engine.guardrails.evidence import evidence_guardrail
 from knowflix_engine.llms import LLM_MAIN, LLM_CHEAP
 from knowflix_engine.schemas.models import (
+    ExtractedSkills,
+    ReviewDraft,
     SummaryOutput,
-    SkillsOutput,
-    ReviewedProfile,
 )
 
 
@@ -37,7 +37,7 @@ class DocumentCrew:
     def extract_skills(self) -> Task:
         return Task(
             config=self.tasks_config["extract_skills"],
-            output_pydantic=SkillsOutput,
+            output_pydantic=ExtractedSkills,
             context=[],
             guardrail=evidence_guardrail,
             guardrail_max_retries=2,
@@ -47,8 +47,10 @@ class DocumentCrew:
     def review(self) -> Task:
         return Task(
             config=self.tasks_config["review"],
-            output_pydantic=ReviewedProfile,
+            output_pydantic=ReviewDraft,
             context=[self.summarize(), self.extract_skills()],
+            guardrail=evidence_guardrail,
+            guardrail_max_retries=2,
         )
 
     @crew

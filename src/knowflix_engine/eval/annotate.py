@@ -40,7 +40,7 @@ def main():
         print(f"File {out_yaml} esistente. Nessuna modifica.")
         
     print("\n--- TESTO PER ANNOTAZIONE (Method & Results) ---\n")
-    print(doc.text_of(("method", "results")))
+    print(doc.text_of(("methodology", "results")))
     print("\n------------------------------------------------\n")
 
 if __name__ == "__main__":

@@ -121,17 +121,20 @@ def parse_pdf(pdf_path: str, doc_id: str) -> ParsedDocument:
     
     heading_map = {
         "abstract": "abstract",
-        "introduzione": "intro",
-        "introduction": "intro",
-        "metodi": "method",
-        "metodologia": "method",
-        "methods": "method",
+        "introduzione": "introduction",
+        "introduction": "introduction",
+        "metodi": "methodology",
+        "metodologia": "methodology",
+        "methods": "methodology",
+        "methodology": "methodology",
         "risultati": "results",
         "results": "results",
         "discussione": "discussion",
         "discussion": "discussion",
-        "conclusioni": "conclusion",
-        "conclusions": "conclusion",
+        "conclusioni": "conclusions",
+        "conclusions": "conclusions",
+        "appendice": "appendix",
+        "appendix": "appendix",
         "bibliografia": "bibliography",
         "references": "bibliography"
     }
@@ -182,6 +185,6 @@ def parse_pdf(pdf_path: str, doc_id: str) -> ParsedDocument:
         doc_id=doc_id,
         sections=sections,
         figures=figures,
-        parser_version="1.0",
+        parser_version="2.0",
         bibliography="\n\n".join(bibliography_text)
     )

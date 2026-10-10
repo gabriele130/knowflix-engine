@@ -22,7 +22,7 @@ extract_skills:
 
     Per ogni competenza fornisci: label (nome della competenza),
     evidence (la frase ESATTA copiata dal testo, verbatim),
-    section_kind, confidence (valore tra 0 e 1).
+    confidence (valore tra 0 e 1).
 
     Vietato: competenze trasversali generiche; competenze dedotte dal dominio
     invece che dal metodo; evidence riformulate o parafrasate.
@@ -36,7 +36,9 @@ review:
     Ricevi la sintesi e le competenze estratte. Elimina le competenze
     generiche o non supportate dalla evidence. Verifica che le keyword siano
     coerenti con le competenze. Elenca in rejected le competenze scartate
-    con il relativo motivo.
+    con il relativo motivo. Per le competenze che mantieni, copia label,
+    evidence e confidence senza modificarle: le evidence vengono
+    riverificate sul testo originale.
   expected_output: >
     Il profilo completo rivisto, in formato JSON.
   agent: reviewer

@@ -44,14 +44,14 @@ def run_batch(pattern: str = "fixtures/*.json"):
             flow.kickoff(inputs={"job_id": parsed["doc_id"],
                                  "job_type": "document", "parsed": parsed})
             m = flow.state.metrics
-            n_skills = len(flow.state.profile.get("skills", []))
-            ok = not m.get("failed", False)
+            ok = flow.state.error is None
+            n_skills = len(flow.state.profile["skills"]) if ok else 0
             
             row = {"doc": parsed["doc_id"], "sec": m.get("seconds"),
                    "usage": m.get("usage"), "skills": n_skills, "ok": ok}
                    
             if not ok:
-                row["err"] = m.get("error")
+                row["err"] = flow.state.error
             elif not m.get("cached"):
                 cost = calculate_cost(m.get("usage"), model_in_use)
                 if cost is not None:

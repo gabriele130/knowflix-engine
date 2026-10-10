@@ -5,7 +5,7 @@ from unittest.mock import patch, MagicMock
 
 from knowflix_engine.main import KnowflixFlow, _is_transient
 from knowflix_engine.guardrails.evidence import evidence_guardrail, set_document_context
-from knowflix_engine.schemas.models import ParsedDocument
+from knowflix_engine.schemas.models import ParsedDocument, ReviewDraft, ReviewedProfile
 from knowflix_engine.config import ENGINE_VERSION
 
 # --- 1. TEST GUARDRAIL EVIDENCE ---
@@ -66,47 +66,46 @@ def test_cache_miss_and_hit(mock_parsed_doc, tmp_path):
     flow.state.parsed = mock_parsed_doc
     
     cache_dir = tmp_path / "cache"
+    cache_dir.mkdir(parents=True, exist_ok=True)
     cache_file = cache_dir / f"test_cache_01_{ENGINE_VERSION}.json"
-    
-    with patch("knowflix_engine.main.os.makedirs") as mock_makedirs, \
-         patch("knowflix_engine.main.os.path.join", return_value=str(cache_file)), \
+    draft = ReviewDraft(one_liner="x", abstract_150="y", keywords=["k"], skills=[])
+    expected_profile = ReviewedProfile(one_liner="x", abstract_150="y",
+                                       keywords=["k"], skills=[]).model_dump()
+
+    with patch("knowflix_engine.main.os.path.join", return_value=str(cache_file)), \
          patch("knowflix_engine.main.DocumentCrew") as mock_crew:
-        
+
         # Mocking LLM crew
         mock_crew_instance = MagicMock()
         mock_crew.return_value.crew.return_value = mock_crew_instance
-        
+
         mock_result = MagicMock()
-        mock_result.pydantic.model_dump.return_value = {"skills": [{"label": "Test"}]}
+        mock_result.pydantic = draft
         mock_crew_instance.kickoff.return_value = mock_result
-        
+
         # MISS
         assert not cache_file.exists()
         flow.run_document()
-        
+
         assert flow.state.metrics.get("cached") is False
-        assert flow.state.profile == {"skills": [{"label": "Test"}]}
+        assert flow.state.profile == expected_profile
         mock_crew_instance.kickoff.assert_called_once()
-        
-        # Create cache file manually to simulate save (since we mocked path but not open in main)
-        # Wait, the main.py open will write to the mocked path natively if we just patch os.path.join? No, os.path.join returns string.
-        # Actually, main.py uses standard open with cache_path. So it WILL write to tmp_path / cache / ...
-        
+
     assert cache_file.exists()
-    
+
     # HIT
     flow_hit = KnowflixFlow()
     flow_hit.state.job_id = "test_cache_01"
     flow_hit.state.job_type = "document"
     flow_hit.state.parsed = mock_parsed_doc
-    
+
     with patch("knowflix_engine.main.os.path.join", return_value=str(cache_file)), \
          patch("knowflix_engine.main.DocumentCrew") as mock_crew_hit:
-        
+
         flow_hit.run_document()
-        
+
         assert flow_hit.state.metrics.get("cached") is True
-        assert flow_hit.state.profile == {"skills": [{"label": "Test"}]}
+        assert flow_hit.state.profile == expected_profile
         mock_crew_hit.assert_not_called()
 
 # --- 3. TEST RESILIENZA (Extra coverage per il fix) ---

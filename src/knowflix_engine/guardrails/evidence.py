@@ -1,11 +1,19 @@
 import re
 from difflib import SequenceMatcher
 
-_CTX = {"full_text": ""}
+# Segmenti su cui le evidence vengono cercate: (section_kind, testo normalizzato).
+# Un'evidence deve stare dentro UN segmento: non puo' scavalcare due sezioni.
+_CTX: dict[str, list[tuple[str, str]]] = {"segments": []}
+
+
+def set_evidence_sections(sections: list[tuple[str, str]]) -> None:
+    """Imposta le sezioni (kind, testo) in cui le evidence sono ammesse."""
+    _CTX["segments"] = [(kind, _norm(text)) for kind, text in sections]
 
 
 def set_document_context(text: str) -> None:
-    _CTX["full_text"] = _norm(text)
+    """Contesto a segmento unico (kind "other"), es. il ramo company."""
+    set_evidence_sections([("other", text)])
 
 
 def _norm(s: str) -> str:
@@ -27,10 +35,17 @@ def _present(needle: str, hay: str, threshold: float = 0.90) -> bool:
     return False
 
 
+def locate_evidence(evidence: str) -> str | None:
+    """section_kind del primo segmento che contiene l'evidence, None se assente."""
+    for kind, hay in _CTX["segments"]:
+        if _present(evidence, hay):
+            return kind
+    return None
+
+
 def evidence_guardrail(output):
     data = output.pydantic
-    hay = _CTX["full_text"]
-    bad = [s.label for s in data.skills if not _present(s.evidence, hay)]
+    bad = [s.label for s in data.skills if locate_evidence(s.evidence) is None]
     if bad:
         return (
             False,

@@ -1,0 +1,46 @@
+summarize_company:
+  description: >
+    Analizza questi dati aziendali in lingua {lang}.
+
+    DATI:
+    {text_company}
+
+    Produci: one_liner (massimo 25 parole), abstract_150 (circa 150 parole;
+    se i dati sono insufficienti, dillo esplicitamente nell'abstract),
+    keywords (0-10 termini, solo se supportati dai dati).
+    Non inventare informazioni assenti dai dati. Scrivi in lingua {lang}.
+  expected_output: >
+    Un oggetto JSON con i campi one_liner, abstract_150, keywords.
+  agent: analyst
+
+extract_company_skills:
+  description: >
+    Individua competenze e tecnologie dell'azienda. Lavora ESCLUSIVAMENTE
+    sui dati forniti qui sotto, non sulla tua conoscenza generale
+    dell'azienda o del settore.
+
+    DATI:
+    {text_company}
+
+    Per ogni competenza fornisci: label (nome della competenza),
+    evidence (la frase ESATTA copiata dai dati, verbatim),
+    confidence (valore tra 0 e 1).
+
+    Vietato: competenze dedotte dalla reputazione o dal settore
+    dell'azienda invece che dai dati forniti; evidence riformulate o
+    parafrasate. Se i dati non contengono abbastanza informazioni,
+    restituisci una lista vuota. Massimo 12 competenze.
+  expected_output: >
+    Un oggetto JSON con la lista skills.
+  agent: tech_scout
+
+review_company:
+  description: >
+    Ricevi la sintesi e le competenze estratte. Elimina le competenze
+    generiche o non supportate dalla evidence. Elenca in rejected le
+    competenze scartate con il relativo motivo.
+    Per le competenze che mantieni, copia label, evidence e confidence
+    senza modificarle: le evidence vengono riverificate sui dati originali.
+  expected_output: >
+    Il profilo completo rivisto, in formato JSON.
+  agent: reviewer
