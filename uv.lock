@@ -1361,26 +1361,28 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "crewai", extra = ["anthropic", "google-genai"] },
-    { name = "pymupdf" },
-    { name = "pymupdf4llm" },
     { name = "pyyaml" },
 ]
 
 [package.dev-dependencies]
 dev = [
+    { name = "pymupdf" },
+    { name = "pymupdf4llm" },
     { name = "pytest" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "crewai", extras = ["anthropic", "google-genai", "ollama"], specifier = "==1.15.17" },
-    { name = "pymupdf", specifier = ">=1.28.2" },
-    { name = "pymupdf4llm", specifier = ">=1.28.2" },
     { name = "pyyaml", specifier = ">=6.0.3" },
 ]
 
 [package.metadata.requires-dev]
-dev = [{ name = "pytest", specifier = ">=9.1.1" }]
+dev = [
+    { name = "pymupdf", specifier = ">=1.28.2" },
+    { name = "pymupdf4llm", specifier = ">=1.28.2" },
+    { name = "pytest", specifier = ">=9.1.1" },
+]
 
 [[package]]
 name = "kubernetes"
