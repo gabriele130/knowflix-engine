@@ -24,7 +24,7 @@ JSON Schema:
 - input: [`schema/parsed_document.schema.json`](schema/parsed_document.schema.json)
 - output, successo: [`schema/reviewed_profile.schema.json`](schema/reviewed_profile.schema.json)
 - output, errore: [`schema/engine_error.schema.json`](schema/engine_error.schema.json)
-- esempio: _Nessun esempio presente: eseguire `scripts/gen_example_output.py`._
+- esempio: [`schema/example_output.json`](schema/example_output.json) — output di un run reale sul fixture, generato da `scripts/gen_example_output.py` (metadati del run in [`schema/example_output.meta.json`](schema/example_output.meta.json)).
 
 ## 2 · Campi
 

@@ -1,0 +1,12 @@
+{
+  "fixture": "fixtures/doc_test.json",
+  "engine_version": "2.0",
+  "model": "anthropic/claude-haiku-4-5",
+  "generated_at": "2026-10-13T10:36:22+00:00",
+  "seconds": 25.2,
+  "skills": 12,
+  "skills_with_skill_id": 0,
+  "taxonomy_version": "1.0",
+  "taxonomy_coverage": 0.0,
+  "final_evidence_verified_in_declared_section": 12
+}
