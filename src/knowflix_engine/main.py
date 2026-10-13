@@ -365,6 +365,9 @@ def kickoff():
     print(json.dumps(flow.state.profile, indent=2, ensure_ascii=False))
     print("METRICHE:", flow.state.metrics)
 
+def run_with_trigger():
+    """Entry-point usato da CrewAI AMP: gli input arrivano via API."""
+    kickoff()
 
 def plot():
     KnowflixFlow().plot()
