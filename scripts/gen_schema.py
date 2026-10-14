@@ -75,7 +75,7 @@ MEANINGS: dict[str, dict[str, str]] = {
         "abstract_150": "Sintesi di circa 150 parole.",
         "keywords": "Termini tecnici specifici (prompt: 5-10).",
         "skills": "Competenze estratte e revisionate; vedi tabella `Skill`.",
-        "rejected": "Label delle competenze scartate dal reviewer perché generiche.",
+        "rejected": "Competenze scartate, con motivo: dal reviewer (generiche, attribuite a terzi) o dal guardrail (evidence non trovata nel testo).",
         "review_notes": "Note libere del reviewer.",
         "cover_figure_id": "`id` della figura scelta come cover (scoring deterministico in `cover.py`); null se nessuna figura ha punteggio > 0.",
         "taxonomy_version": "Versione della tassonomia usata per il linking (`TAXONOMY_VERSION`). Sempre valorizzato nel profilo restituito.",
@@ -112,7 +112,7 @@ ERROR_MEANINGS: dict[str, str] = {
     "rate_limited": "Il provider LLM limita le richieste (HTTP 429, quota esaurita).",
     "provider_unavailable": "Il provider LLM non è raggiungibile o è in errore (HTTP 5xx, errore di connessione, sovraccarico).",
     "timeout": "La chiamata al provider LLM è scaduta (HTTP 408/504, timeout).",
-    "internal_error": "Qualsiasi altro errore, incluso il guardrail delle evidenze che esaurisce i retry.",
+    "internal_error": "Qualsiasi altro errore non classificato.",
 }
 
 
@@ -149,7 +149,10 @@ def guardrail_retries(crew_cls, task_name: str) -> int | None:
                    for k in n.keywords}
             if "guardrail" not in kws:
                 return None
-            return ast.literal_eval(kws["guardrail_max_retries"])
+            value = kws["guardrail_max_retries"]
+            if isinstance(value, ast.Name):  # costante importata, es. GUARDRAIL_MAX_RETRIES
+                return getattr(sys.modules[crew_cls.__module__], value.id)
+            return ast.literal_eval(value)
     raise RuntimeError(f"task {task_name} non trovata")
 
 
@@ -361,10 +364,13 @@ viene mai restituito un `ReviewedProfile` parziale.
 
 ## 7 · Evidenze: cosa è garantito e cosa no
 
-Il guardrail `evidence_guardrail` è applicato a {guarded_str}: la verifica
+Il guardrail delle evidenze è applicato a {guarded_str}: la verifica
 vale quindi sul **profilo finale**, non solo sull'output intermedio. Se il
-reviewer riscrive un'evidenza, il guardrail la rifiuta e la task viene
-ritentata; se i retry si esauriscono il job fallisce con `internal_error`.
+modello produce un'evidenza non presente nel testo, il guardrail la rifiuta e
+la task viene ritentata; se i retry si esauriscono, le sole competenze ancora
+non verificate vengono **rimosse** dal profilo e riportate in `rejected` come
+`"<label>: evidence non trovata nel testo"`. Il job non fallisce per questo
+motivo.
 
 Garantito, per ogni `Skill.evidence` del profilo restituito:
 - compare dentro **una singola sezione** tra {_codes(SKILL_KINDS)}. Un'evidenza

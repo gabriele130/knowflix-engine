@@ -13,6 +13,8 @@ from knowflix_engine.config import TAXONOMY_VERSION
 from knowflix_engine.crews.document_crew.document_crew import DocumentCrew
 from knowflix_engine.crews.scout_crew.scout_crew import ScoutCrew
 from knowflix_engine.guardrails.evidence import (
+    EvidenceGuardrail,
+    dropped_skills,
     evidence_guardrail,
     locate_evidence,
     set_evidence_sections,
@@ -109,8 +111,57 @@ def run_flow(parsed=None, crew=None, job_type="document", company_raw=None, cls=
                                                  (ScoutCrew, "review_company")])
 def test_review_task_has_evidence_guardrail(crew_cls, task_name):
     task = getattr(crew_cls(), task_name)()
-    assert task.guardrail is evidence_guardrail
-    assert task.guardrail_max_retries == 2
+    assert isinstance(task.guardrail, EvidenceGuardrail)
+    assert task.guardrail_max_retries == task.guardrail.max_retries == 2
+
+
+def _bad_draft():
+    return make_draft([
+        ExtractedSkill(label="Python", confidence=0.9,
+                       evidence="implementato in Python con NumPy"),
+        ExtractedSkill(label="Rotoscoping", confidence=0.7,
+                       evidence="gli animatori dello studio ricalcavano il girato dal vero"),
+    ])
+
+
+def test_evidence_guardrail_retries_then_drops_unverified_skills():
+    set_evidence_sections([("methodology", METHOD_TEXT)])
+    guard = EvidenceGuardrail("review")
+    for _ in range(guard.max_retries):  # tentativi con feedback all'agente
+        ok, msg = guard(SimpleNamespace(pydantic=_bad_draft(), raw="", json_dict=None))
+        assert ok is False and "Rotoscoping" in msg
+    out = SimpleNamespace(pydantic=_bad_draft(), raw="", json_dict=None)
+    ok, result = guard(out)  # ultimo tentativo: pota invece di fallire
+    assert ok is True and result is out
+    assert [s.label for s in out.pydantic.skills] == ["Python"]
+    assert "Rotoscoping" not in out.raw and "Python" in out.raw
+    assert dropped_skills() == ["Rotoscoping: evidence non trovata nel testo"]
+
+
+def test_evidence_guardrail_counter_resets_with_new_document():
+    set_evidence_sections([("methodology", METHOD_TEXT)])
+    guard = EvidenceGuardrail("review")
+    guard(SimpleNamespace(pydantic=_bad_draft(), raw="", json_dict=None))
+    set_evidence_sections([("methodology", METHOD_TEXT)])
+    ok, _ = guard(SimpleNamespace(pydantic=_bad_draft(), raw="", json_dict=None))
+    assert ok is False  # nuovo kickoff: si riparte dai retry, non dalla potatura
+    assert dropped_skills() == []
+
+
+def test_dropped_skills_end_in_rejected_not_in_skills():
+    class DroppingCrew(FakeCrew):
+        def kickoff(self, inputs):
+            result = super().kickoff(inputs)
+            guard = EvidenceGuardrail("review", max_retries=0)
+            out = SimpleNamespace(pydantic=_bad_draft(), raw="", json_dict=None)
+            guard(out)
+            return SimpleNamespace(pydantic=out.pydantic, token_usage=None)
+
+    flow, result, _, _ = run_flow(make_doc(), crew=DroppingCrew())
+    assert [s["label"] for s in result["skills"]] == ["Python"]
+    assert "Rotoscoping: evidence non trovata nel testo" in result["rejected"]
+    assert flow.state.metrics["dropped_skills"] == 1
+    assert flow.state.error is None
 
 
 def test_guardrail_rejects_evidence_rewritten_by_reviewer():

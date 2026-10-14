@@ -24,9 +24,26 @@ extract_skills:
     evidence (la frase ESATTA copiata dal testo, verbatim),
     confidence (valore tra 0 e 1).
 
+    Attribuisci all'autore SOLO cio' che l'autore ha fatto in questo
+    lavoro: ha progettato, implementato, realizzato, misurato, analizzato.
+    NON sono competenze dell'autore le tecniche, i metodi o gli strumenti
+    che il testo descrive come usati da altri (artisti, animatori, studi di
+    produzione, aziende, autori citati, casi studio, rassegna storica o
+    dello stato dell'arte), anche se descritti in dettaglio. Esempio: se la
+    tesi spiega come gli animatori di uno studio usavano il rotoscoping, il
+    rotoscoping NON e' una competenza dell'autore; lo diventa solo se il
+    testo dice che l'autore lo ha applicato nel proprio lavoro. Se l'autore
+    ha analizzato criticamente quelle tecniche, la competenza e' l'analisi
+    (es. "analisi delle tecniche di animazione tradizionale"), non
+    l'esecuzione della tecnica. Nel dubbio, escludi la competenza.
+
+    L'evidence deve essere la frase che mostra l'autore all'opera, non
+    quella che descrive la tecnica in generale. Copiala da UNA sola sezione,
+    senza unire frasi diverse.
+
     Vietato: competenze trasversali generiche; competenze dedotte dal dominio
-    invece che dal metodo; evidence riformulate o parafrasate.
-    Massimo 12 competenze.
+    invece che dal metodo; competenze di terzi descritte nel testo;
+    evidence riformulate o parafrasate. Massimo 12 competenze.
   expected_output: >
     Un oggetto JSON con la lista skills.
   agent: skill_extractor
@@ -34,7 +51,10 @@ extract_skills:
 review:
   description: >
     Ricevi la sintesi e le competenze estratte. Elimina le competenze
-    generiche o non supportate dalla evidence. Verifica che le keyword siano
+    generiche o non supportate dalla evidence. Elimina anche le competenze
+    la cui evidence descrive il lavoro di altri (artisti, animatori, studi,
+    aziende, autori citati, casi studio) invece che il lavoro svolto
+    dall'autore, con motivo "attribuita a terzi". Verifica che le keyword siano
     coerenti con le competenze. Elenca in rejected le competenze scartate
     con il relativo motivo. Per le competenze che mantieni, copia label,
     evidence e confidence senza modificarle: le evidence vengono

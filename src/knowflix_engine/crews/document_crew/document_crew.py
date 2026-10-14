@@ -1,6 +1,9 @@
 from crewai import Agent, Crew, Process, Task
 from crewai.project import CrewBase, agent, crew, task
-from knowflix_engine.guardrails.evidence import evidence_guardrail
+from knowflix_engine.guardrails.evidence import (
+    GUARDRAIL_MAX_RETRIES,
+    EvidenceGuardrail,
+)
 from knowflix_engine.llms import LLM_MAIN, LLM_CHEAP
 from knowflix_engine.schemas.models import (
     ExtractedSkills,
@@ -39,8 +42,8 @@ class DocumentCrew:
             config=self.tasks_config["extract_skills"],
             output_pydantic=ExtractedSkills,
             context=[],
-            guardrail=evidence_guardrail,
-            guardrail_max_retries=2,
+            guardrail=EvidenceGuardrail("extract_skills"),
+            guardrail_max_retries=GUARDRAIL_MAX_RETRIES,
         )
 
     @task
@@ -49,8 +52,8 @@ class DocumentCrew:
             config=self.tasks_config["review"],
             output_pydantic=ReviewDraft,
             context=[self.summarize(), self.extract_skills()],
-            guardrail=evidence_guardrail,
-            guardrail_max_retries=2,
+            guardrail=EvidenceGuardrail("review"),
+            guardrail_max_retries=GUARDRAIL_MAX_RETRIES,
         )
 
     @crew

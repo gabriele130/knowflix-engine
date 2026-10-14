@@ -3,7 +3,7 @@ import os
 import json
 
 # Versione del motore (usata per invalidare la cache quando cambia il prompt o lo schema)
-ENGINE_VERSION = "2.0"
+ENGINE_VERSION = "2.1"
 
 # Versione della tabella TAXONOMY in taxonomy.py: va incrementata a ogni
 # modifica di voci o sinonimi. Esposta nell'output (ReviewedProfile.taxonomy_version).

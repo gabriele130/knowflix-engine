@@ -17,7 +17,9 @@ from knowflix_engine.cover import pick_cover
 from knowflix_engine.crews.document_crew.document_crew import DocumentCrew
 from knowflix_engine.crews.scout_crew.scout_crew import ScoutCrew
 from knowflix_engine.guardrails.evidence import (
+    dropped_skills,
     locate_evidence,
+    reset_evidence_attempts,
     set_document_context,
     set_evidence_sections,
 )
@@ -113,7 +115,8 @@ def assemble_profile(draft: ReviewDraft, cover_figure_id: str | None = None) -> 
     """ReviewDraft (LLM) -> ReviewedProfile, con section_kind assegnato dal motore.
 
     section_kind e' la sezione di input in cui l'evidence viene trovata, mai
-    un valore generato dal modello.
+    un valore generato dal modello. Le competenze scartate dal guardrail per
+    evidence non verificata finiscono in rejected.
     """
     skills = []
     for s in draft.skills:
@@ -127,7 +130,8 @@ def assemble_profile(draft: ReviewDraft, cover_figure_id: str | None = None) -> 
         abstract_150=draft.abstract_150,
         keywords=draft.keywords,
         skills=skills,
-        rejected=draft.rejected,
+        rejected=draft.rejected + [d for d in dropped_skills()
+                                   if d not in draft.rejected],
         review_notes=draft.review_notes,
         cover_figure_id=cover_figure_id,
     ).model_dump()
@@ -170,6 +174,7 @@ class KnowflixFlow(Flow[EngineState]):
 
         def reset() -> None:
             done["tasks"] = 0
+            reset_evidence_attempts()
 
         def on_task_done(_output) -> None:
             done["tasks"] += 1
@@ -188,6 +193,13 @@ class KnowflixFlow(Flow[EngineState]):
         self.state.metrics = {"failed": True, "error_code": code, "error": message}
         if t0 is not None:
             self.state.metrics["seconds"] = round(time.time() - t0, 1)
+
+    def _note_dropped_skills(self) -> None:
+        dropped = dropped_skills()
+        self.state.metrics["dropped_skills"] = len(dropped)
+        if dropped:
+            self.state.warnings.append(
+                f"{len(dropped)} competenze scartate per evidence non verificata")
 
     def _validate_document(self) -> None:
         parsed = self.state.parsed
@@ -285,6 +297,7 @@ class KnowflixFlow(Flow[EngineState]):
             "usage": usage.model_dump() if hasattr(usage, "model_dump") else str(usage),
             "cached": False,
         }
+        self._note_dropped_skills()
 
         # --- SAVE TO CACHE ---
         with open(cache_path, "w", encoding="utf-8") as f:
@@ -320,6 +333,7 @@ class KnowflixFlow(Flow[EngineState]):
             "usage": usage.model_dump() if hasattr(usage, "model_dump") else str(usage),
             "cached": False,
         }
+        self._note_dropped_skills()
 
     @listen(or_(run_document, run_company))
     def finalize(self):

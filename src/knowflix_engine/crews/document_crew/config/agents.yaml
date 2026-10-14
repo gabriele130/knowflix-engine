@@ -22,6 +22,8 @@ skill_extractor:
     ANSYS, la competenza e' "simulazione strutturale CAE", non "ingegneria".
     Non deduci mai competenze dal titolo o dalla facolta', solo dal metodo
     descritto nel testo.
+    Distingui sempre chi fa cosa: una tesi che racconta le tecniche di
+    qualcun altro dimostra che l'autore le conosce, non che le sa applicare.
 
 reviewer:
   role: >
@@ -32,3 +34,5 @@ reviewer:
   backstory: >
     Sei severo. Competenze come "problem solving", "lavoro di squadra" o
     "informatica" le elimini sempre: non sono verificabili nel testo.
+    Elimini anche le competenze che il testo attribuisce ad altri (artisti,
+    autori citati, casi studio) e non all'autore dell'elaborato.

@@ -7,7 +7,7 @@
 
 | Cosa | Valore | Fonte |
 |---|---|---|
-| Motore (`ENGINE_VERSION`) | `2.0` | `config.py` |
+| Motore (`ENGINE_VERSION`) | `2.1` | `config.py` |
 | Tassonomia (`TAXONOMY_VERSION`) | `1.0` | `config.py` |
 | `parser_version` supportate | `2.0` | `config.SUPPORTED_PARSER_VERSIONS` |
 | Voci in tassonomia | 8 | `taxonomy.TAXONOMY` |
@@ -56,7 +56,7 @@ JSON Schema:
 | `abstract_150` | `str` | sì | — | Sintesi di circa 150 parole. |
 | `keywords` | `list[str]` | sì | — | Termini tecnici specifici (prompt: 5-10). |
 | `skills` | `list[Skill]` | sì | — | Competenze estratte e revisionate; vedi tabella `Skill`. |
-| `rejected` | `list[str]` | no | `[]` | Label delle competenze scartate dal reviewer perché generiche. |
+| `rejected` | `list[str]` | no | `[]` | Competenze scartate, con motivo: dal reviewer (generiche, attribuite a terzi) o dal guardrail (evidence non trovata nel testo). |
 | `review_notes` | `str` | no | `""` | Note libere del reviewer. |
 | `cover_figure_id` | `str \| None` | no | `null` | `id` della figura scelta come cover (scoring deterministico in `cover.py`); null se nessuna figura ha punteggio > 0. |
 | `taxonomy_version` | `str \| None` | no | `null` | Versione della tassonomia usata per il linking (`TAXONOMY_VERSION`). Sempre valorizzato nel profilo restituito. |
@@ -183,7 +183,7 @@ viene mai restituito un `ReviewedProfile` parziale.
 | `rate_limited` | **true** | Il provider LLM limita le richieste (HTTP 429, quota esaurita). |
 | `provider_unavailable` | **true** | Il provider LLM non è raggiungibile o è in errore (HTTP 5xx, errore di connessione, sovraccarico). |
 | `timeout` | **true** | La chiamata al provider LLM è scaduta (HTTP 408/504, timeout). |
-| `internal_error` | false | Qualsiasi altro errore, incluso il guardrail delle evidenze che esaurisce i retry. |
+| `internal_error` | false | Qualsiasi altro errore non classificato. |
 
 - `retryable` è derivato dal codice (`provider_unavailable`, `rate_limited`, `timeout` → true,
   tutti gli altri → false); il modello rifiuta combinazioni incoerenti.
@@ -198,10 +198,13 @@ viene mai restituito un `ReviewedProfile` parziale.
 
 ## 7 · Evidenze: cosa è garantito e cosa no
 
-Il guardrail `evidence_guardrail` è applicato a `extract_skills` (max 2 retry), `review` (max 2 retry): la verifica
+Il guardrail delle evidenze è applicato a `extract_skills` (max 2 retry), `review` (max 2 retry): la verifica
 vale quindi sul **profilo finale**, non solo sull'output intermedio. Se il
-reviewer riscrive un'evidenza, il guardrail la rifiuta e la task viene
-ritentata; se i retry si esauriscono il job fallisce con `internal_error`.
+modello produce un'evidenza non presente nel testo, il guardrail la rifiuta e
+la task viene ritentata; se i retry si esauriscono, le sole competenze ancora
+non verificate vengono **rimosse** dal profilo e riportate in `rejected` come
+`"<label>: evidence non trovata nel testo"`. Il job non fallisce per questo
+motivo.
 
 Garantito, per ogni `Skill.evidence` del profilo restituito:
 - compare dentro **una singola sezione** tra `methodology`, `results`, `discussion`. Un'evidenza
