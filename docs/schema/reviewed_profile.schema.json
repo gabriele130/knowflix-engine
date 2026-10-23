@@ -146,6 +146,18 @@
     },
     "public_card": {
       "$ref": "#/$defs/PublicCard"
+    },
+    "engine_version": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Engine Version"
     }
   },
   "required": [

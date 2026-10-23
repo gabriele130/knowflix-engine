@@ -2,6 +2,12 @@
 import re
 from knowflix_engine.schemas.models import ParsedDocument, Section
 
+# "CAPITOLO 1", "Capitolo II - Titolo", "Chapter 3": i capitoli centrali di
+# molte tesi hanno titoli liberi, spesso in grassetto alla stessa dimensione
+# del corpo, e senza questo riconoscimento finirebbero nella sezione precedente
+CHAPTER_RE = re.compile(r"^(capitolo|chapter)\s+([ivxlc]+|\d+)\b[\s.:\-–]*", re.IGNORECASE)
+
+
 def normalize_hf(text: str) -> str:
     # Replace numbers with <NUM>, lowercase, strip
     s = re.sub(r'\d+', '<NUM>', text)
@@ -47,6 +53,7 @@ def parse_pdf(pdf_path: str, doc_id: str) -> ParsedDocument:
             if b.get("type") == 0: # text block
                 block_lines = []
                 max_font = 0
+                all_bold = True
                 for line in b.get("lines", []):
                     line_text = "".join(s.get("text", "") for s in line.get("spans", []))
                     norm_line = normalize_hf(line_text)
@@ -60,6 +67,9 @@ def parse_pdf(pdf_path: str, doc_id: str) -> ParsedDocument:
                     for s in line.get("spans", []):
                         if s.get("size", 0) > max_font:
                             max_font = s.get("size")
+                        if s.get("text", "").strip() and not (
+                                s.get("flags", 0) & 16 or "bold" in s.get("font", "").lower()):
+                            all_bold = False
                             
                     block_lines.append(line_text.strip())
                 
@@ -74,7 +84,8 @@ def parse_pdf(pdf_path: str, doc_id: str) -> ParsedDocument:
                     
                     block_text = " ".join(text_parts).strip()
                     if block_text:
-                        cleaned_blocks.append({"text": block_text, "font": max_font, "bbox": b.get("bbox")})
+                        cleaned_blocks.append({"text": block_text, "font": max_font,
+                                               "bold": all_bold, "bbox": b.get("bbox")})
             
             elif b.get("type") == 1: # image block
                 bbox = b.get("bbox")
@@ -155,9 +166,17 @@ def parse_pdf(pdf_path: str, doc_id: str) -> ParsedDocument:
         if len(text) < 150:
             t_lower = text.lower().strip()
             t_clean = re.sub(r'^\d+(\.\d+)*\s*', '', t_lower)
+            chapter = CHAPTER_RE.match(t_lower)
             if t_clean in heading_map:
                 is_heading = True
                 mapped_kind = heading_map[t_clean]
+            elif chapter and (cb["bold"] or f > body_font):
+                # "Capitolo 2 Metodologia" resta methodology; un capitolo dal
+                # titolo libero e' corpo della tesi: discussion, cosi' entra
+                # nell'estrazione competenze
+                is_heading = True
+                rest = t_lower[chapter.end():].strip()
+                mapped_kind = heading_map.get(rest, "discussion")
             elif f > body_font:
                 is_heading = True
         
@@ -185,6 +204,6 @@ def parse_pdf(pdf_path: str, doc_id: str) -> ParsedDocument:
         doc_id=doc_id,
         sections=sections,
         figures=figures,
-        parser_version="2.0",
+        parser_version="2.1",
         bibliography="\n\n".join(bibliography_text)
     )

@@ -64,7 +64,7 @@ reviewer → review (→ ReviewDraft, guardrail: evidence, context: summarize + 
 - Il guardrail `evidence_guardrail` è applicato sia a `extract_skills` sia a
   `review` (max 2 retry ciascuno): la garanzia sulle evidence vale sul
   profilo finale. Stessa struttura nella `ScoutCrew`.
-- Il guardrail è un'istanza di `EvidenceGuardrail`: esauriti i retry non fa
+- Il guardrail è creato da `make_evidence_guardrail`: esauriti i retry non fa
   fallire il job, ma rimuove le sole skill ancora non verificate e le
   riporta in `rejected` (`"<label>: evidence non trovata nel testo"`,
   `metrics["dropped_skills"]`). Nessuna evidence non verificata arriva
@@ -268,7 +268,7 @@ uv run plot
 
 ### 6.2 · `guardrails/evidence.py` — Soglia evidence
 
-Il guardrail (`EvidenceGuardrail`, che usa la stessa verifica di
+Il guardrail (`make_evidence_guardrail`, che usa la stessa verifica di
 `evidence_guardrail`) controlla che ogni evidence sia una citazione testuale
 presente **dentro una singola sezione** tra `SKILL_KINDS` (methodology,
 results, discussion), con fuzzy match ≥ 0.90. Un'evidence che scavalca due
@@ -292,6 +292,8 @@ profilo. Lo scarto riguarda la competenza, non il job.
 - ❌ **Non si allenta la soglia** per far passare più competenze.
 - ❌ Non si disabilita il guardrail su nessuna delle due task, e non si
   alzano i `guardrail_max_retries` oltre un livello ragionevole.
+- ❌ Il guardrail deve restare una **funzione**, non un oggetto chiamabile:
+  crewai fa `inspect.getsource()` sul guardrail quando emette i suoi eventi.
 - ❌ Lo scarto all'ultimo tentativo non diventa mai un'accettazione: una
   competenza non verificata si rimuove, non si tiene "con riserva".
 - ❌ Non si allarga il perimetro di ricerca oltre `SKILL_KINDS` (es. al

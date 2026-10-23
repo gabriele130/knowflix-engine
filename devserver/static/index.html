@@ -243,7 +243,7 @@ function renderError(err) {
     invalid_payload: "Il documento non rispetta il formato atteso.",
     unsupported_payload_version: "parser_version non supportata da questo motore.",
     empty_content: "Il documento non contiene testo nelle sezioni usate dal motore.",
-    internal_error: "Errore interno (incluso il guardrail delle evidenze che esaurisce i retry).",
+    internal_error: "Errore interno del motore.",
   }[err.code] || "";
   return `<h2>Errore</h2>
     <div class="panel error ${err.retryable ? "retry" : ""}">

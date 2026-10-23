@@ -3,7 +3,7 @@ import os
 import json
 
 # Versione del motore (usata per invalidare la cache quando cambia il prompt o lo schema)
-ENGINE_VERSION = "2.1"
+ENGINE_VERSION = "2.2"
 
 # Versione della tabella TAXONOMY in taxonomy.py: va incrementata a ogni
 # modifica di voci o sinonimi. Esposta nell'output (ReviewedProfile.taxonomy_version).
@@ -11,7 +11,7 @@ TAXONOMY_VERSION = "1.0"
 
 # Versioni di ParsedDocument.parser_version accettate in ingresso.
 # 2.0 = enum sezioni Knowflix (introduction, methodology, conclusions, ...).
-SUPPORTED_PARSER_VERSIONS = ("2.0",)
+SUPPORTED_PARSER_VERSIONS = ("2.0", "2.1")
 
 # Prezzi per 1M token (input, output) in USD
 DEFAULT_PRICING = {

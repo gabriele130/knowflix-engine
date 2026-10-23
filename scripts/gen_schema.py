@@ -57,7 +57,7 @@ SCHEMAS = {
 # voce per un campo che non esiste piu'.
 MEANINGS: dict[str, dict[str, str]] = {
     "ParsedDocument": {
-        "doc_id": "Identificativo del documento. Insieme a ENGINE_VERSION forma la chiave di cache (`cache/{doc_id}_{ENGINE_VERSION}.json`).",
+        "doc_id": "Identificativo del documento. Insieme a ENGINE_VERSION e a un'impronta del contenuto (lingua, sezioni, figure) forma la chiave di cache (`cache/{doc_id}_{ENGINE_VERSION}_{impronta}.json`): lo stesso doc_id con un testo diverso non riusa il profilo vecchio.",
         "lang": "Lingua del documento; passata ai prompt come `{lang}`.",
         "meta": "Metadati liberi del preprocessor. Non letti dal motore.",
         "sections": "Testo segmentato per sezione; vedi tabella `Section`. Se nessuna sezione usata dal motore contiene testo il job fallisce con `empty_content`.",
@@ -81,6 +81,7 @@ MEANINGS: dict[str, dict[str, str]] = {
         "taxonomy_version": "Versione della tassonomia usata per il linking (`TAXONOMY_VERSION`). Sempre valorizzato nel profilo restituito.",
         "taxonomy_coverage": "Quota di `skills` con `skill_id` non nullo, arrotondata a 3 decimali; null se il profilo non ha skill. Vedi §4.",
         "public_card": "Scheda pubblica; vedi tabella `PublicCard`. Presente nel contratto ma **non popolata** in questa versione.",
+        "engine_version": "Versione del motore che ha prodotto il profilo (`ENGINE_VERSION`). Sempre valorizzato nel profilo restituito; serve a capire quale deploy ha eseguito il job.",
     },
     "Skill": {
         "label": "Nome della competenza come prodotto dall'LLM.",
@@ -96,6 +97,7 @@ MEANINGS: dict[str, dict[str, str]] = {
         "code": "Codice dell'errore; vedi tabella in §6.",
         "message": "Descrizione leggibile. Non stabile: non va interpretata dal consumer.",
         "retryable": "true se ripetere lo stesso job più tardi può riuscire. Determinato dal `code`, mai indipendente.",
+        "engine_version": "Versione del motore che ha prodotto l'errore (`ENGINE_VERSION`). Sempre valorizzato negli errori restituiti dal Flow.",
     },
 }
 

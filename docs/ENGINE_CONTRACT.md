@@ -7,9 +7,9 @@
 
 | Cosa | Valore | Fonte |
 |---|---|---|
-| Motore (`ENGINE_VERSION`) | `2.1` | `config.py` |
+| Motore (`ENGINE_VERSION`) | `2.2` | `config.py` |
 | Tassonomia (`TAXONOMY_VERSION`) | `1.0` | `config.py` |
-| `parser_version` supportate | `2.0` | `config.SUPPORTED_PARSER_VERSIONS` |
+| `parser_version` supportate | `2.0`, `2.1` | `config.SUPPORTED_PARSER_VERSIONS` |
 | Voci in tassonomia | 8 | `taxonomy.TAXONOMY` |
 
 `ENGINE_VERSION` è anche parte della chiave di cache: un cambio di versione
@@ -32,7 +32,7 @@ JSON Schema:
 
 | Campo | Tipo | Obbligatorio | Default | Significato |
 |---|---|---|---|---|
-| `doc_id` | `str` | sì | — | Identificativo del documento. Insieme a ENGINE_VERSION forma la chiave di cache (`cache/{doc_id}_{ENGINE_VERSION}.json`). |
+| `doc_id` | `str` | sì | — | Identificativo del documento. Insieme a ENGINE_VERSION e a un'impronta del contenuto (lingua, sezioni, figure) forma la chiave di cache (`cache/{doc_id}_{ENGINE_VERSION}_{impronta}.json`): lo stesso doc_id con un testo diverso non riusa il profilo vecchio. |
 | `lang` | `str` | no | `"it"` | Lingua del documento; passata ai prompt come `{lang}`. |
 | `meta` | `dict` | no | `{}` | Metadati liberi del preprocessor. Non letti dal motore. |
 | `sections` | `list[Section]` | sì | — | Testo segmentato per sezione; vedi tabella `Section`. Se nessuna sezione usata dal motore contiene testo il job fallisce con `empty_content`. |
@@ -62,6 +62,7 @@ JSON Schema:
 | `taxonomy_version` | `str \| None` | no | `null` | Versione della tassonomia usata per il linking (`TAXONOMY_VERSION`). Sempre valorizzato nel profilo restituito. |
 | `taxonomy_coverage` | `float \| None` | no | `null` | Quota di `skills` con `skill_id` non nullo, arrotondata a 3 decimali; null se il profilo non ha skill. Vedi §4. |
 | `public_card` | `PublicCard` | no | `{"abstract": null}` | Scheda pubblica; vedi tabella `PublicCard`. Presente nel contratto ma **non popolata** in questa versione. |
+| `engine_version` | `str \| None` | no | `null` | Versione del motore che ha prodotto il profilo (`ENGINE_VERSION`). Sempre valorizzato nel profilo restituito; serve a capire quale deploy ha eseguito il job. |
 
 #### `Skill`
 
@@ -89,6 +90,7 @@ versione**: il motore non fa nessuna generazione aggiuntiva per la scheda.
 | `code` | `Literal['invalid_payload', 'unsupported_payload_version', 'unauthorized', 'empty_content', 'rate_limited', 'provider_unavailable', 'timeout', 'internal_error']` | sì | — | Codice dell'errore; vedi tabella in §6. |
 | `message` | `str` | sì | — | Descrizione leggibile. Non stabile: non va interpretata dal consumer. |
 | `retryable` | `bool` | sì | — | true se ripetere lo stesso job più tardi può riuscire. Determinato dal `code`, mai indipendente. |
+| `engine_version` | `str \| None` | no | `null` | Versione del motore che ha prodotto l'errore (`ENGINE_VERSION`). Sempre valorizzato negli errori restituiti dal Flow. |
 
 ## 3 · Sezioni accettate
 

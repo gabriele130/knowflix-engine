@@ -99,6 +99,7 @@ class ReviewedProfile(BaseModel):
     taxonomy_version: str | None = None
     taxonomy_coverage: float | None = None
     public_card: PublicCard = Field(default_factory=PublicCard)
+    engine_version: str | None = None
 
 
 # --- ERRORI ---
@@ -115,6 +116,7 @@ class EngineError(BaseModel):
     code: ErrorCode
     message: str
     retryable: bool
+    engine_version: str | None = None
 
     @classmethod
     def of(cls, code: str, message: str) -> "EngineError":

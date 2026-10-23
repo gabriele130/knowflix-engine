@@ -9,11 +9,11 @@ import pytest
 from pydantic import ValidationError
 
 from knowflix_engine import main
-from knowflix_engine.config import TAXONOMY_VERSION
+from knowflix_engine.config import ENGINE_VERSION, TAXONOMY_VERSION
 from knowflix_engine.crews.document_crew.document_crew import DocumentCrew
 from knowflix_engine.crews.scout_crew.scout_crew import ScoutCrew
 from knowflix_engine.guardrails.evidence import (
-    EvidenceGuardrail,
+    make_evidence_guardrail,
     dropped_skills,
     evidence_guardrail,
     locate_evidence,
@@ -111,8 +111,19 @@ def run_flow(parsed=None, crew=None, job_type="document", company_raw=None, cls=
                                                  (ScoutCrew, "review_company")])
 def test_review_task_has_evidence_guardrail(crew_cls, task_name):
     task = getattr(crew_cls(), task_name)()
-    assert isinstance(task.guardrail, EvidenceGuardrail)
+    assert task.guardrail.__name__.startswith("evidence_guardrail_")
     assert task.guardrail_max_retries == task.guardrail.max_retries == 2
+
+
+@pytest.mark.parametrize("crew_cls, task_name", [(DocumentCrew, "review"),
+                                                 (ScoutCrew, "review_company")])
+def test_guardrail_survives_crewai_guardrail_event(crew_cls, task_name):
+    # crewai emette questo evento a ogni controllo e fa getsource() sul
+    # guardrail: un oggetto chiamabile qui fa fallire il job
+    from crewai.events.types.llm_guardrail_events import LLMGuardrailStartedEvent
+    task = getattr(crew_cls(), task_name)()
+    event = LLMGuardrailStartedEvent(guardrail=task.guardrail, retry_count=0)
+    assert event.guardrail_type == "function"
 
 
 def _bad_draft():
@@ -126,7 +137,7 @@ def _bad_draft():
 
 def test_evidence_guardrail_retries_then_drops_unverified_skills():
     set_evidence_sections([("methodology", METHOD_TEXT)])
-    guard = EvidenceGuardrail("review")
+    guard = make_evidence_guardrail("review")
     for _ in range(guard.max_retries):  # tentativi con feedback all'agente
         ok, msg = guard(SimpleNamespace(pydantic=_bad_draft(), raw="", json_dict=None))
         assert ok is False and "Rotoscoping" in msg
@@ -140,7 +151,7 @@ def test_evidence_guardrail_retries_then_drops_unverified_skills():
 
 def test_evidence_guardrail_counter_resets_with_new_document():
     set_evidence_sections([("methodology", METHOD_TEXT)])
-    guard = EvidenceGuardrail("review")
+    guard = make_evidence_guardrail("review")
     guard(SimpleNamespace(pydantic=_bad_draft(), raw="", json_dict=None))
     set_evidence_sections([("methodology", METHOD_TEXT)])
     ok, _ = guard(SimpleNamespace(pydantic=_bad_draft(), raw="", json_dict=None))
@@ -152,7 +163,7 @@ def test_dropped_skills_end_in_rejected_not_in_skills():
     class DroppingCrew(FakeCrew):
         def kickoff(self, inputs):
             result = super().kickoff(inputs)
-            guard = EvidenceGuardrail("review", max_retries=0)
+            guard = make_evidence_guardrail("review", max_retries=0)
             out = SimpleNamespace(pydantic=_bad_draft(), raw="", json_dict=None)
             guard(out)
             return SimpleNamespace(pydantic=out.pydantic, token_usage=None)
@@ -208,7 +219,8 @@ def test_stale_cache_with_invented_section_kind_is_ignored():
     bad = {"one_liner": "x", "abstract_150": "x", "keywords": [],
            "skills": [{"label": "a", "evidence": METHOD_TEXT,
                        "section_kind": "metodologia", "confidence": 1.0}]}
-    with open(f"cache/it_test_{ENGINE_VERSION}.json", "w", encoding="utf-8") as f:
+    path = main.cache_path_for(ParsedDocument(**make_doc()))
+    with open(path, "w", encoding="utf-8") as f:
         json.dump(bad, f)
     flow, result, _, crew = run_flow(make_doc())
     assert len(crew.inputs) == 1  # cache scartata, crew eseguita
@@ -267,6 +279,14 @@ def test_progress_emitted_at_task_boundaries():
     flow, _, events, _ = run_flow(make_doc())
     assert events == [0, 33, 66, 100]
     assert flow.state.progress == 100
+
+
+def test_cache_ignored_when_same_doc_id_has_new_content():
+    run_flow(make_doc())
+    resegmented = make_doc()
+    resegmented["sections"][2]["kind"] = "discussion"  # stesso doc_id, parser diverso
+    _, _, _, crew = run_flow(resegmented)
+    assert len(crew.inputs) == 1
 
 
 def test_progress_on_cache_hit():
@@ -337,7 +357,8 @@ def test_error_retryable_flag(code, retryable):
 
 def _assert_error_result(flow, result, code):
     assert result == flow.state.error
-    assert set(result) == {"code", "message", "retryable"}
+    assert set(result) == {"code", "message", "retryable", "engine_version"}
+    assert result["engine_version"] == ENGINE_VERSION
     assert result["code"] == code
     assert flow.state.profile is None
     with pytest.raises(ValidationError):  # non e' un ReviewedProfile
@@ -419,3 +440,8 @@ def test_public_card_present_but_not_populated():
     _, result, _, _ = run_flow(make_doc())
     assert result["public_card"] == {"abstract": None}
     ReviewedProfile.model_validate(result)
+
+
+def test_profile_reports_engine_version():
+    _, result, _, _ = run_flow(make_doc())
+    assert result["engine_version"] == ENGINE_VERSION

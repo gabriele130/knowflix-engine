@@ -79,33 +79,32 @@ def evidence_guardrail(output):
     return (True, data)
 
 
-class EvidenceGuardrail:
-    """evidence_guardrail con esito finale non distruttivo.
+def make_evidence_guardrail(name: str, max_retries: int = GUARDRAIL_MAX_RETRIES):
+    """evidence_guardrail con esito finale non distruttivo, per la task `name`.
 
     Per i primi max_retries tentativi rifiuta l'output come evidence_guardrail,
     chiedendo all'agente di correggere le citazioni. All'ultimo tentativo,
     invece di far fallire l'intero job, rimuove le sole competenze con
     evidence non verificata e le registra in dropped_skills(). La verifica non
     e' allentata: nessuna evidence non trovata arriva al profilo.
+
+    Restituisce una funzione, non un oggetto chiamabile: crewai fa
+    inspect.getsource() sul guardrail quando emette i suoi eventi.
     """
 
-    def __init__(self, name: str, max_retries: int = GUARDRAIL_MAX_RETRIES):
-        self.name = name
-        self.max_retries = max_retries
-
-    def __call__(self, output):
+    def guardrail(output):
         data = output.pydantic
         bad = [s for s in data.skills if locate_evidence(s.evidence) is None]
         failures = _CTX["failures"]
         if not bad:
-            failures.pop(self.name, None)
+            failures.pop(name, None)
             return (True, output)
-        if failures.get(self.name, 0) < self.max_retries:
-            failures[self.name] = failures.get(self.name, 0) + 1
+        if failures.get(name, 0) < max_retries:
+            failures[name] = failures.get(name, 0) + 1
             return (False, _feedback(bad))
 
         # ultimo tentativo: si scartano le competenze non verificate
-        failures.pop(self.name, None)
+        failures.pop(name, None)
         bad_ids = {id(s) for s in bad}
         kept = data.model_copy(
             update={"skills": [s for s in data.skills if id(s) not in bad_ids]})
@@ -117,3 +116,7 @@ class EvidenceGuardrail:
         output.raw = kept.model_dump_json()
         output.json_dict = None
         return (True, output)
+
+    guardrail.__name__ = f"evidence_guardrail_{name}"
+    guardrail.max_retries = max_retries
+    return guardrail

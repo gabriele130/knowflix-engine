@@ -1,4 +1,5 @@
-﻿import json
+﻿import hashlib
+import json
 import logging
 import os
 import sys
@@ -137,6 +138,17 @@ def assemble_profile(draft: ReviewDraft, cover_figure_id: str | None = None) -> 
     ).model_dump()
 
 
+def cache_path_for(doc: ParsedDocument) -> str:
+    """Percorso di cache del profilo: doc_id, versione del motore e impronta
+    del contenuto. Lo stesso doc_id con un testo diverso (es. segmentato di
+    nuovo da un parser corretto) non riusa il profilo vecchio."""
+    content = json.dumps({"lang": doc.lang, "figures": doc.figures,
+                          "sections": [s.model_dump() for s in doc.sections]},
+                         sort_keys=True, ensure_ascii=False, default=str)
+    digest = hashlib.sha256(content.encode("utf-8")).hexdigest()[:12]
+    return os.path.join("cache", f"{doc.doc_id}_{ENGINE_VERSION}_{digest}.json")
+
+
 # --------------- progress ---------------
 
 # Valore emesso al termine di ciascuno dei tre task della crew; 0 all'avvio.
@@ -186,6 +198,7 @@ class KnowflixFlow(Flow[EngineState]):
 
     def _fail(self, code: str, message: str, t0: float | None = None) -> None:
         err = EngineError.of(code, message)
+        err.engine_version = ENGINE_VERSION
         logger.error("job %s failed [%s]: %s", self.state.job_id, code, message)
         self.state.error = err.model_dump()
         self.state.profile = None
@@ -260,7 +273,7 @@ class KnowflixFlow(Flow[EngineState]):
 
         # --- CACHE CHECK ---
         os.makedirs("cache", exist_ok=True)
-        cache_path = os.path.join("cache", f"{doc.doc_id}_{ENGINE_VERSION}.json")
+        cache_path = cache_path_for(doc)
 
         if os.path.exists(cache_path):
             with open(cache_path, "r", encoding="utf-8") as f:
@@ -356,6 +369,7 @@ class KnowflixFlow(Flow[EngineState]):
         else:
             profile["taxonomy_coverage"] = None
         profile["taxonomy_version"] = TAXONOMY_VERSION
+        profile["engine_version"] = ENGINE_VERSION
         self.state.profile = ReviewedProfile.model_validate(profile).model_dump()
         # TODO: persistenza, evento di indicizzazione
         return self.state.profile
